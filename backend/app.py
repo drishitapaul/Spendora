@@ -1,56 +1,111 @@
 from flask import Flask, request, jsonify
+from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
-from models import db, Transaction
 
 app = Flask(__name__)
 CORS(app)
 
+# Database config
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///finance.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-db.init_app(app)
+db = SQLAlchemy(app)
 
+# -------------------------------
+# MODEL
+# -------------------------------
+class Transaction(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(100), nullable=False)
+    amount = db.Column(db.Float, nullable=False)
+    type = db.Column(db.String(10), nullable=False)
+
+# -------------------------------
+# INIT DB
+# -------------------------------
 with app.app_context():
     db.create_all()
 
-@app.route('/')
+# -------------------------------
+# ROUTES
+# -------------------------------
+
+# Home route (for testing)
+@app.route("/")
 def home():
-    return "Backend running 🚀"
+    return "Backend running"
 
-@app.route('/transactions', methods=['POST'])
+# Get all transactions
+@app.route("/transactions", methods=["GET"])
+def get_transactions():
+    transactions = Transaction.query.all()
+    result = []
+
+    for t in transactions:
+        result.append({
+            "id": t.id,
+            "title": t.title,
+            "amount": t.amount,
+            "type": t.type
+        })
+
+    return jsonify(result)
+
+# Add transaction
+@app.route("/transactions", methods=["POST"])
 def add_transaction():
-    data = request.json
+    data = request.get_json()
 
-    if not data.get('title') or not data.get('amount') or not data.get('type'):
+    title = data.get("title")
+    amount = data.get("amount")
+    type_ = data.get("type")
+
+    # Validation
+    if not title or amount is None or not type_:
         return jsonify({"error": "Missing fields"}), 400
 
-    txn = Transaction(
-        title=data['title'],
-        amount=float(data['amount']),
-        type=data['type']
+    try:
+        amount = float(amount)
+    except:
+        return jsonify({"error": "Invalid amount"}), 400
+
+    new_transaction = Transaction(
+        title=title,
+        amount=amount,
+        type=type_
     )
 
-    db.session.add(txn)
+    db.session.add(new_transaction)
     db.session.commit()
 
-    return jsonify({"message": "Added successfully"})
+    return jsonify({"message": "Transaction added"})
 
-@app.route('/transactions', methods=['GET'])
-def get_transactions():
-    txns = Transaction.query.all()
-    return jsonify([t.to_dict() for t in txns])
+# Insight route
+@app.route("/insights", methods=["GET"])
+def get_insights():
+    transactions = Transaction.query.all()
 
-@app.route('/insights', methods=['GET'])
-def insights():
-    txns = Transaction.query.all()
-    total_expense = sum(t.amount for t in txns if t.type == 'expense')
+    total_income = sum(t.amount for t in transactions if t.type == "income")
+    total_expense = sum(t.amount for t in transactions if t.type == "expense")
 
-    if total_expense > 5000:
-        msg = "bestie… maybe slow down on spending 😭"
+    if total_expense > total_income:
+        insight = "Your expenses are higher than your income. Consider reducing spending."
+    elif total_income > total_expense:
+        insight = "Good job! You are saving money."
     else:
-        msg = "you're doing great financially 💅"
+        insight = "Your income and expenses are balanced."
 
-    return jsonify({"insight": msg})
+    return jsonify({"insight": insight})
 
+# Reset data (for demo/testing)
+@app.route("/reset", methods=["DELETE"])
+def reset_data():
+    Transaction.query.delete()
+    db.session.commit()
+    return jsonify({"message": "All data cleared"})
+
+# -------------------------------
+# RUN
+# -------------------------------
 if __name__ == "__main__":
     app.run()
