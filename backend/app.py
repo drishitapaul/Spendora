@@ -5,7 +5,9 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
-# Database config
+# -------------------------------
+# DATABASE CONFIG
+# -------------------------------
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///finance.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
@@ -21,7 +23,7 @@ class Transaction(db.Model):
     type = db.Column(db.String(10), nullable=False)
 
 # -------------------------------
-# INIT DB
+# INIT DATABASE
 # -------------------------------
 with app.app_context():
     db.create_all()
@@ -30,28 +32,30 @@ with app.app_context():
 # ROUTES
 # -------------------------------
 
-# Home route (for testing)
+# Health check
 @app.route("/")
 def home():
     return "Backend running"
 
-# Get all transactions
+# -------------------------------
+# GET ALL TRANSACTIONS
+# -------------------------------
 @app.route("/transactions", methods=["GET"])
 def get_transactions():
     transactions = Transaction.query.all()
-    result = []
 
-    for t in transactions:
-        result.append({
+    return jsonify([
+        {
             "id": t.id,
             "title": t.title,
             "amount": t.amount,
             "type": t.type
-        })
+        } for t in transactions
+    ])
 
-    return jsonify(result)
-
-# Add transaction
+# -------------------------------
+# ADD TRANSACTION
+# -------------------------------
 @app.route("/transactions", methods=["POST"])
 def add_transaction():
     data = request.get_json()
@@ -64,10 +68,13 @@ def add_transaction():
     if not title or amount is None or not type_:
         return jsonify({"error": "Missing fields"}), 400
 
+    if type_ not in ["income", "expense"]:
+        return jsonify({"error": "Invalid type"}), 400
+
     try:
         amount = float(amount)
     except:
-        return jsonify({"error": "Invalid amount"}), 400
+        return jsonify({"error": "Amount must be a number"}), 400
 
     new_transaction = Transaction(
         title=title,
@@ -78,9 +85,36 @@ def add_transaction():
     db.session.add(new_transaction)
     db.session.commit()
 
-    return jsonify({"message": "Transaction added"})
+    return jsonify({"message": "Transaction added"}), 201
 
-# Insight route
+# -------------------------------
+# DELETE SINGLE TRANSACTION
+# -------------------------------
+@app.route("/transactions/<int:id>", methods=["DELETE"])
+def delete_transaction(id):
+    transaction = Transaction.query.get(id)
+
+    if not transaction:
+        return jsonify({"error": "Transaction not found"}), 404
+
+    db.session.delete(transaction)
+    db.session.commit()
+
+    return jsonify({"message": "Transaction deleted"})
+
+# -------------------------------
+# RESET ALL DATA
+# -------------------------------
+@app.route("/reset", methods=["DELETE"])
+def reset_data():
+    Transaction.query.delete()
+    db.session.commit()
+
+    return jsonify({"message": "All data cleared"})
+
+# -------------------------------
+# INSIGHTS
+# -------------------------------
 @app.route("/insights", methods=["GET"])
 def get_insights():
     transactions = Transaction.query.all()
@@ -95,17 +129,14 @@ def get_insights():
     else:
         insight = "Your income and expenses are balanced."
 
-    return jsonify({"insight": insight})
-
-# Reset data (for demo/testing)
-@app.route("/reset", methods=["DELETE"])
-def reset_data():
-    Transaction.query.delete()
-    db.session.commit()
-    return jsonify({"message": "All data cleared"})
+    return jsonify({
+        "income": total_income,
+        "expense": total_expense,
+        "insight": insight
+    })
 
 # -------------------------------
-# RUN
+# RUN APP
 # -------------------------------
 if __name__ == "__main__":
     app.run()
