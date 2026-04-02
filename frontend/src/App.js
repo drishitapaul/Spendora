@@ -3,15 +3,14 @@ import axios from "axios";
 import { PieChart, Pie, Cell, Tooltip } from "recharts";
 
 function App() {
-  const API = "https://spendora-0ude.onrender.com";
+  const API = "https://spendora-0ude.onrender.com"; // replace if needed
 
   const theme = {
     bg: "#F7F4D5",
     card: "#ffffff",
     primary: "#839958",
     dark: "#0A3323",
-    accent: "#D3968C",
-    deep: "#105666"
+    accent: "#D3968C"
   };
 
   const COLORS = [
@@ -58,7 +57,24 @@ function App() {
     }
   };
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const deleteTransaction = async (id) => {
+    try {
+      await axios.delete(`${API}/transactions/${id}`);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const resetData = async () => {
+    try {
+      await axios.delete(`${API}/reset`);
+      fetchData();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -79,8 +95,9 @@ function App() {
         fontFamily: "Poppins"
       }}
     >
-      <h2 style={{ color: theme.dark }}>Lofi Finance</h2>
+      <h2 style={{ color: theme.dark }}>Spendora</h2>
 
+      {/* FORM */}
       <div
         style={{
           background: theme.card,
@@ -88,78 +105,66 @@ function App() {
           borderRadius: "16px",
           marginBottom: "20px",
           display: "flex",
-          gap: "10px",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.05)"
+          gap: "10px"
         }}
       >
         <input
           placeholder="Title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          style={{
-            padding: "10px",
-            borderRadius: "8px",
-            border: "1px solid #ddd"
-          }}
         />
 
         <input
           placeholder="Amount"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          style={{
-            padding: "10px",
-            borderRadius: "8px",
-            border: "1px solid #ddd"
-          }}
         />
 
-        <select
-          value={type}
-          onChange={(e) => setType(e.target.value)}
-          style={{
-            padding: "10px",
-            borderRadius: "8px"
-          }}
-        >
+        <select value={type} onChange={(e) => setType(e.target.value)}>
           <option value="expense">Expense</option>
           <option value="income">Income</option>
         </select>
 
-        <button
-          onClick={addTransaction}
-          style={{
-            background: theme.primary,
-            color: "white",
-            border: "none",
-            padding: "10px 16px",
-            borderRadius: "8px",
-            cursor: "pointer"
-          }}
-        >
+        <button onClick={addTransaction} style={{ background: theme.primary }}>
           Add
         </button>
       </div>
 
+      {/* RESET BUTTON */}
+      <button
+        onClick={resetData}
+        style={{
+          background: theme.dark,
+          color: "white",
+          padding: "10px",
+          borderRadius: "8px",
+          border: "none",
+          marginBottom: "20px",
+          cursor: "pointer"
+        }}
+      >
+        Reset All Data
+      </button>
+
+      {/* INSIGHT */}
       <div
         style={{
           background: theme.card,
           padding: "20px",
           borderRadius: "16px",
-          marginBottom: "20px",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.05)"
+          marginBottom: "20px"
         }}
       >
         <h4>Insight</h4>
         <p>{insight}</p>
       </div>
 
+      {/* TRANSACTIONS */}
       <div
         style={{
           background: theme.card,
           padding: "20px",
-          borderRadius: "16px",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.05)"
+          borderRadius: "16px"
         }}
       >
         <h4>Transactions</h4>
@@ -177,44 +182,51 @@ function App() {
                   background: "#f9f9f9",
                   borderRadius: "8px",
                   display: "flex",
-                  justifyContent: "space-between"
+                  justifyContent: "space-between",
+                  alignItems: "center"
                 }}
               >
                 <span>{t.title}</span>
                 <span>₹{t.amount}</span>
                 <span>{t.type}</span>
+
+                <button
+                  onClick={() => deleteTransaction(t.id)}
+                  style={{
+                    background: theme.accent,
+                    border: "none",
+                    color: "white",
+                    padding: "6px 10px",
+                    borderRadius: "6px",
+                    cursor: "pointer"
+                  }}
+                >
+                  Delete
+                </button>
               </li>
             ))}
           </ul>
         )}
       </div>
 
+      {/* CHART */}
       <div
         style={{
           background: theme.card,
           padding: "20px",
           borderRadius: "16px",
-          marginTop: "20px",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.05)"
+          marginTop: "20px"
         }}
       >
         <h4>Expense Breakdown</h4>
 
         {expenseData.length === 0 ? (
-          <p>No expense data available</p>
+          <p>No expense data</p>
         ) : (
           <PieChart width={300} height={300}>
-            <Pie
-              data={expenseData}
-              dataKey="value"
-              nameKey="name"
-              outerRadius={100}
-            >
+            <Pie data={expenseData} dataKey="value" nameKey="name" outerRadius={100}>
               {expenseData.map((entry, index) => (
-                <Cell
-                  key={`cell-${index}`}
-                  fill={COLORS[index % COLORS.length]}
-                />
+                <Cell key={index} fill={COLORS[index % COLORS.length]} />
               ))}
             </Pie>
             <Tooltip />
